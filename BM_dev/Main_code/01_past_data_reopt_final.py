@@ -22,17 +22,14 @@ import folium
 from folium.plugins import Fullscreen
 import matplotlib as mplb
 
-"""TODOs:
-- Makespan Minimization
-"""
 
 
 def read_inputs():
     """Reads the inputs from the central Excel file."""
-    df_vehicle_ids = pds.read_excel('Central_Input_Data_Andre.xlsx', sheet_name='Vehicle_ids')
-    df_locations_and_coords = pds.read_excel('Central_Input_Data_Andre.xlsx', sheet_name='Location_names_to_coords')
-    df_planned_locations = pds.read_excel('Central_Input_Data_Andre.xlsx', sheet_name='Planned_locations')
-    df_vehicle_availability_matrix = pds.read_excel('Central_Input_Data_Andre.xlsx',
+    df_vehicle_ids = pds.read_excel('BM_dev/Main_code/Central_Input_Data_Andre.xlsx', sheet_name='Vehicle_ids')
+    df_locations_and_coords = pds.read_excel('BM_dev/Main_code/Central_Input_Data_Andre.xlsx', sheet_name='Location_names_to_coords')
+    df_planned_locations = pds.read_excel('BM_dev/Main_code/Central_Input_Data_Andre.xlsx', sheet_name='Planned_locations')
+    df_vehicle_availability_matrix = pds.read_excel('BM_dev/Main_code/Central_Input_Data_Andre.xlsx',
                                                     sheet_name='Vehicle_availability_matrix')
     all_location_names = df_locations_and_coords['NAME'].tolist()
 
@@ -49,11 +46,11 @@ def read_inputs():
     geo_dict = {}
     # Add the dist and geo rows as sub-dicts to their respective outer dicts.
     for ITER_IDX in range(len(all_location_names)):
-        with open(f'json_files_for_dist_and_geo_matrices\\revised_distance_matrix_row_'
+        with open(f'BM_dev/Main_code/json_files_for_dist_and_geo_matrices/revised_distance_matrix_row_'
                   f'{all_location_names[ITER_IDX]}.json') as dismarow:
             dist_row = json.load(dismarow)
         dist_dict.update(dist_row)
-        with open(f'json_files_for_dist_and_geo_matrices\\revised_geometry_matrix_row_'
+        with open(f'BM_dev/Main_code/json_files_for_dist_and_geo_matrices/revised_geometry_matrix_row_'
                   f'{all_location_names[ITER_IDX]}.json') as geomarow:
             geo_row = json.load(geomarow)
         geo_dict.update(geo_row)
@@ -89,14 +86,14 @@ def generate_distance_matrix(_locations, _dist_dict):
         distance_matrix.append(row_i_of_distance_matrix)
     return distance_matrix
 
-
+# TODO: Maybe there is something wrong? That is why the performance is bad with these additional edge definitions.
 def generate_optimized_routes_with_pyvrp(_max_runtime_in_seconds,
                                          _full_coords_list_dummy_clients_pyvrp,
                                          _full_distances_dummy_clients_pyvrp,
                                          _vehicle_capacities_dummy_clients_pyvrp,
                                          _full_demands_dummy_clients_pyvrp,
                                          _starting_points_indices,
-                                         _end_points_indices, _functioning_vehicle_ids):
+                                         _end_points_indices, _functioning_vehicle_ids, _seed):
     """Generates optimized routes for the vehicles using the PyVRP solver. Outputs a list of int lists"""
     node_indices_all_tours_current_optimization_pyvrp = []
     pyvrp_model = Model()
@@ -179,7 +176,7 @@ def generate_optimized_routes_with_pyvrp(_max_runtime_in_seconds,
                         location_that_is_visited_idx] if frm != to else 0
                     pyvrp_model.add_edge(frm, to, distance=correct_distance)
 
-    result_pyvrp = pyvrp_model.solve(stop=MaxRuntime(_max_runtime_in_seconds), seed=42,
+    result_pyvrp = pyvrp_model.solve(stop=MaxRuntime(_max_runtime_in_seconds), seed=_seed,
                                      display=False)
     assert result_pyvrp.is_feasible()
 
@@ -195,10 +192,11 @@ def generate_optimized_routes_with_pyvrp(_max_runtime_in_seconds,
         # print(f"Clients\n{internal_clients}")
         clients = [idx + 1 for idx in route.visits() if (idx + 1) < first_dummy_client_location_index]
         # print(f"Actual clients\n{clients}")
-        node_indices_all_tours_current_optimization_pyvrp.append([start] + clients)
+        node_indices_all_tours_current_optimization_pyvrp.append([start] + clients + [end])
 
+    """
     print(f"Objective value PyVRP: {result_pyvrp.cost()}")
-
+    """
     # The latter returns the vehicle ids for double-checking purposes.
     return node_indices_all_tours_current_optimization_pyvrp, [str(vehicle_type) for vehicle_type in
                                                                pyvrp_model.vehicle_types]
@@ -294,20 +292,17 @@ def generate_optimized_routes_with_or_routing(_max_runtime_in_seconds,
     return node_indices_all_tours_current_optimization_or_routing
 
 
-def main():
+def main(_proposed_seed, _proposed_order_horizon):
     """Run the optimizations for a specific order horizon length"""
 
     # Read in the central inputs.
     (df_vehicle_ids, df_locations_and_coords, df_planned_locations,
      df_vehicle_availability_matrix, dist_dict, geo_dict, name_to_coords_dict) = read_inputs()
 
-    # Set the time that the solver has to get to a solution.
-    max_runtime_in_seconds = 120
-
     # Define the problem instance.
     num_theoretically_available_vehicles = len(df_vehicle_ids['ID'].tolist())
     campaign_length_in_weeks = 20
-    order_horizon = 2
+    order_horizon = _proposed_order_horizon
     pre_campaign_pool_size = order_horizon * num_theoretically_available_vehicles
     all_vehicle_ids = df_vehicle_ids['ID'].tolist()
     # Vehicle Availability Matrix needs dropna() since some columns of the pandas dataframe are not completely filled.
@@ -320,7 +315,6 @@ def main():
         color_rgba = cmap(color_float)
         color_hex = mplb.colors.to_hex(color_rgba, keep_alpha=True)
         all_vehicle_colors.append(color_hex)
-    vehicle_id_to_color_dictionary = dict(zip(all_vehicle_ids, all_vehicle_colors))
 
     # Initialize some locations lists.
     homebase = df_locations_and_coords['NAME'][0]
@@ -329,13 +323,13 @@ def main():
     starting_points = [homebase] * len(functioning_vehicle_ids_this_week)
 
     # Generate the pre-campaign poi pool.
-    poi_pool = df_planned_locations['WEEK 1'].tolist() + df_planned_locations['WEEK 2'].tolist()
-    for week_num in range(3, order_horizon + 1):
+    poi_pool = df_planned_locations['WEEK 1'].dropna().tolist()
+    for week_num in range(2, order_horizon + 1):
         poi_pool += df_planned_locations[f'WEEK {week_num}'].tolist()
 
     # Initialize some more locations lists.
     full_locations_list = [homebase] + starting_points + poi_pool
-    full_locations_list_dummy_clients_pyvrp = full_locations_list + starting_points
+    full_locations_list_dummy_clients_pyvrp = [homebase] + starting_points + poi_pool + starting_points
     full_distances = generate_distance_matrix(full_locations_list, dist_dict)
     full_distances_dummy_clients_pyvrp = generate_distance_matrix(full_locations_list_dummy_clients_pyvrp, dist_dict)
 
@@ -354,6 +348,9 @@ def main():
     full_demands_dummy_clients_pyvrp = (
             [0] + [0] * len(functioning_vehicle_ids_this_week) + [1] * len(poi_pool)
             + [1] * len(functioning_vehicle_ids_this_week))
+    
+    # Set the time that the solver has to get to a solution.
+    max_runtime_in_seconds = (len(poi_pool) + len(functioning_vehicle_ids_this_week))*2.4*0.2
 
     # Dictionary saves the final routes accessible via the ids as keys. This is needed, because from optimization to
     # optimization the order of the functioning vehicle IDs and thus the order of the routes of an optimization
@@ -378,7 +375,7 @@ def main():
         routes_indices_pyvrp, details_of_pyvrp_vehicle_types = generate_optimized_routes_with_pyvrp(
             max_runtime_in_seconds, full_coords_list_dummy_clients_pyvrp, full_distances_dummy_clients_pyvrp,
             vehicle_capacities_dummy_clients_pyvrp, full_demands_dummy_clients_pyvrp, starting_point_indices,
-            end_points_indices, functioning_vehicle_ids_this_week)
+            end_points_indices, functioning_vehicle_ids_this_week, _seed=_proposed_seed)
 
         # OR-Tools neglects the last tour segment back to the depot in an EMPTY tour.
         # As a result, its planned tours can differ from pyvrp in certain scenarios.
@@ -387,7 +384,6 @@ def main():
         # routes_indices_or_routing = generate_optimized_routes_with_or_routing(
         #     max_runtime_in_seconds, full_coords_list, full_distances, vehicle_capacities,
         #     full_demands, starting_point_indices, end_points_indices, functioning_vehicle_ids_this_week)
-
         print(f"\nTours PyVRP in iteration {optimization_idx}.")
         for route_index in range(len(functioning_vehicle_ids_this_week)):
             temp_planned_tour = [full_locations_list_dummy_clients_pyvrp[loc_idx] for loc_idx in
@@ -425,22 +421,25 @@ def main():
                 visited_location_index]
             # Record the visited coords for the final tour.
             locations_in_final_routes[functioning_vehicle_ids_this_week[route_index]].append(
-                full_locations_list[visited_location_index])
+                full_locations_list_dummy_clients_pyvrp[visited_location_index])
             temp_locations_in_final_routes[functioning_vehicle_ids_this_week[route_index]].append(
-                full_locations_list[visited_location_index])
+                full_locations_list_dummy_clients_pyvrp[visited_location_index])
 
             # Only add a visited location as a starting point if the vehicle is still part of the
             # functioning vehicle ids list OF THE NEXT WEEK!
+            location_in_question = full_locations_list_dummy_clients_pyvrp[visited_location_index]
             if functioning_vehicle_ids_this_week[route_index] in functioning_vehicle_ids_next_week_theoretically:
                 # Set the new starting point.
-                starting_points.append(full_locations_list[visited_location_index])
+                starting_points.append(full_locations_list_dummy_clients_pyvrp[visited_location_index])
                 # Remove location from the poi pool!
-                location_in_question = full_locations_list[visited_location_index]
+
+                """For the real past data reopt we always remove!!"""
                 # Do not try to remove the home-base because it is not part of the poi pool!
                 if visited_location_index != 0:
-                    poi_pool.remove(location_in_question)
+                    poi_pool.remove(location_in_question)  
 
-            else:  # Vehicle broke down and is immediately sent back to the depot.
+            else:  
+                # Vehicle broke down and is immediately sent back to the depot.
                 # Add the distance of the return to the end-depot to the total transfer drive KMs.
                 currently_driven_total_transfer_drive_kilometers_of_the_campaign += \
                     full_distances[visited_location_index][0]
@@ -449,21 +448,27 @@ def main():
                 # Record the broken-down vehicle ids.
                 broken_down_vehicles_this_week.append(functioning_vehicle_ids_this_week[route_index])
 
+                """For the real past data reopt we always remove!!"""
+                # Do not try to remove the home-base because it is not part of the poi pool!
+                if visited_location_index != 0:
+                    poi_pool.remove(location_in_question)
+
         # Check for new incoming functioning vehicle ids. And append the depot to the starting points list.
         new_vehicle_ids_incoming = [id_new for id_new in functioning_vehicle_ids_next_week_theoretically if
                                     id_new not in functioning_vehicle_ids_this_week]
         for idx in range(len(new_vehicle_ids_incoming)):
             starting_points.append(homebase)
 
-        # Use a new functioning_vehicle_ids list to set up the next iteration optimization iteration.
+        # Use a new functioning_vehicle_ids list to set up the next optimization iteration.
         # Put the incoming vehicle ids at the end.
         for id_to_remove in broken_down_vehicles_this_week:
             functioning_vehicle_ids_this_week.remove(id_to_remove)
         functioning_vehicle_ids = functioning_vehicle_ids_this_week + new_vehicle_ids_incoming
 
+        """
         # Create a final folium map. Formerly "if final_optimization_step"
         if optimization_idx == campaign_length_in_weeks:
-            m = folium.Map(name_to_coords_dict['HKS'], zoom_start=5)
+            m = folium.Map(name_to_coords_dict['HKS'], zoom_start=5, tiles='Cartodb Positron')
 
             temp_vehicle_index = 0
             for vehicle_id in all_vehicle_ids:
@@ -473,7 +478,7 @@ def main():
                 for poi_name in locations_currently_visited_in_single_route[1:]:
                     folium.Marker(
                         icon=folium.Icon(icon="thumbtack", prefix='fa', color='gray',
-                                         icon_color=f'{all_vehicle_colors[temp_vehicle_index]}'),
+                                         icon_color=all_vehicle_colors[temp_vehicle_index]),
                         location=name_to_coords_dict[poi_name],
                         tooltip=f'{poi_name}'
                     ).add_to(vehicle_group)
@@ -491,8 +496,8 @@ def main():
 
                     line = {"type": "Feature",
                             "properties": {
-                                "color": vehicle_id_to_color_dictionary[vehicle_id],
-                                "fillColor": vehicle_id_to_color_dictionary[vehicle_id],
+                                "color": all_vehicle_colors[temp_vehicle_index],
+                                "fillColor": all_vehicle_colors[temp_vehicle_index],
                                 "stroke-width": 5},
                             "geometry": geo_data_tour_segment}
 
@@ -513,21 +518,23 @@ def main():
             # Make folium fullscreen.
             m.add_child(Fullscreen())
             m.save(f'Actual_drives_map.html')
+        """
 
         # End of campaign:
         # The last time we add new locations to the poi pool after an optimization is
         # in the week/iteration No. (campaign_length_in_weeks - order_horizon)
         if optimization_idx <= campaign_length_in_weeks - order_horizon:
             # t.o.b.h. + optimization_idx - 1 to look to the plannned locations that are the t.o.b.h. ahead
-            new_locations = df_planned_locations[
-                f'WEEK {order_horizon + optimization_idx}'].tolist()
+            new_locations = df_planned_locations[f'WEEK {order_horizon + optimization_idx}'].dropna().tolist()
             poi_pool += new_locations
 
         # If the poi pool remains empty after disruptions & dynamics it means you have just visited
         # your last location and nothing bad has happened. But the vehicles still need to drive home!
+        """
         if not poi_pool and not final_optimization_step:
             poi_pool = [homebase] * len(functioning_vehicle_ids)
             final_optimization_step = True
+        """
 
         # Update the starting point indices and the number of endpoints.
         starting_point_indices = list(range(1, len(functioning_vehicle_ids) + 1))
@@ -553,8 +560,14 @@ def main():
                                             + [1] * len(functioning_vehicle_ids))
 
         functioning_vehicle_ids_this_week = functioning_vehicle_ids.copy()
+
+        # Set the time that the solver has to get to a solution.
+        max_runtime_in_seconds = (len(poi_pool) + len(functioning_vehicle_ids_this_week))*2.4*0.2
+
         optimization_idx += 1
-        print(f"Current transfer drive kilometers: {currently_driven_total_transfer_drive_kilometers_of_the_campaign}\n")
+        
+        # print(f"Current transfer drive kilometers: {currently_driven_total_transfer_drive_kilometers_of_the_campaign}\n")
+        
 
     # Double-check the final distance after the while loop!
     total_driving_distance_in_km = 0
@@ -565,13 +578,18 @@ def main():
             dist_tour_segment = dist_dict[temp_single_final_route[location_idx]][
                 temp_single_final_route[location_idx + 1]]
             total_driving_distance_in_km += dist_tour_segment
-    print(f'Total travel distance (double check!): {total_driving_distance_in_km} km')
+    print(f'\nTotal travel distance (double check!): {total_driving_distance_in_km} km')
 
+    """
     print(f"\nActually driven routes:")
     for vehicle_id in all_vehicle_ids:
         temp_single_final_route = locations_in_final_routes[vehicle_id]
         print(f"Actually driven route of vehicle {vehicle_id}: {temp_single_final_route}\n")
-
+    """
 
 if __name__ == '__main__':
-    main()
+    seeds = [42, 12, 37, 6, 24, 68, 153, 402, 87, 2]
+    order_horizons = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]
+    for order_horizon in order_horizons:
+        for seed in seeds:
+            main(_proposed_seed=seed, _proposed_order_horizon=order_horizon)

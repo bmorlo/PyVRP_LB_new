@@ -73,6 +73,7 @@ def generate_distance_matrix(_coords):
             # Euklidean distances. Change it to 'Manhattan' for benchmarks.
             temp_row_of_distance_matrix.append(math.ceil(comp_dist.euclidean([frm_x, frm_y], [to_x, to_y])))
         distance_matrix.append(temp_row_of_distance_matrix)
+        max(distance_matrix)
 
     return distance_matrix
 
@@ -216,7 +217,7 @@ def generate_optimized_routes_with_pyvrp(_max_runtime_in_seconds,
                     pyvrp_model.add_edge(frm, to, distance=correct_distance)
 
     result_pyvrp = pyvrp_model.solve(stop=MaxRuntime(_max_runtime_in_seconds), seed=42,
-                                     display=False)
+                                     display=True)
     assert result_pyvrp.is_feasible()
 
     for route in result_pyvrp.best.routes():
@@ -231,7 +232,7 @@ def generate_optimized_routes_with_pyvrp(_max_runtime_in_seconds,
         # print(f"Clients\n{internal_clients}")
         clients = [idx + 1 for idx in route.visits() if (idx + 1) < first_dummy_client_location_index]
         # print(f"Actual clients\n{clients}")
-        node_indices_all_tours_current_optimization_pyvrp.append([start] + clients)
+        node_indices_all_tours_current_optimization_pyvrp.append([start] + clients + [start])
 
     print(f"Objective value PyVRP: {result_pyvrp.cost()}")
 
@@ -412,7 +413,7 @@ def plot_results_euklid(_node_indices_all_tours_current_optimization, _functioni
             if legend_counter == 0:
                 # Only do this once for all the plots.
                 plt.plot(x_final[0:i + 1], y_final[0:i + 1], 'ks-', markersize=6, linewidth=2,
-                         label='Driven routes')
+                         label='Driven tours')
                 legend_counter += 1
             else:
                 plt.plot(x_final[0:i + 1], y_final[0:i + 1], 'ks-', markersize=6, linewidth=2)
