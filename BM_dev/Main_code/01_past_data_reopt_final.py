@@ -86,7 +86,6 @@ def generate_distance_matrix(_locations, _dist_dict):
         distance_matrix.append(row_i_of_distance_matrix)
     return distance_matrix
 
-# TODO: Maybe there is something wrong? That is why the performance is bad with these additional edge definitions.
 def generate_optimized_routes_with_pyvrp(_max_runtime_in_seconds,
                                          _full_coords_list_dummy_clients_pyvrp,
                                          _full_distances_dummy_clients_pyvrp,
@@ -159,10 +158,11 @@ def generate_optimized_routes_with_pyvrp(_max_runtime_in_seconds,
                         # Make it a no-brainer to immediately visit it. We need the additional - 1!
                         pyvrp_model.add_edge(frm, to, distance=0)
                         # We simply disregard any edges from other artificial depots to this dummy client!
+
+                # TODO: Maybe specify those edges but not with such a high distance value!
             else:
                 # A normal client, or a depot was reached. Depots should not be able to reach any client directly.
-                # --> depot to xy = 0
-                # Thus, only set their closed loop edges.
+                # Depots should only be able to reach dummy clients directly!
                 # Depots should only be reached via "zero distance".
                 # Thus, for all the locations you are coming from, depot, client, or dummy client,
                 # set the edge back to the depot to zero.
@@ -194,9 +194,7 @@ def generate_optimized_routes_with_pyvrp(_max_runtime_in_seconds,
         # print(f"Actual clients\n{clients}")
         node_indices_all_tours_current_optimization_pyvrp.append([start] + clients + [end])
 
-    """
-    print(f"Objective value PyVRP: {result_pyvrp.cost()}")
-    """
+    # print(f"Objective value PyVRP: {result_pyvrp.cost()}")
     # The latter returns the vehicle ids for double-checking purposes.
     return node_indices_all_tours_current_optimization_pyvrp, [str(vehicle_type) for vehicle_type in
                                                                pyvrp_model.vehicle_types]
@@ -325,7 +323,7 @@ def main(_proposed_seed, _proposed_order_horizon):
     # Generate the pre-campaign poi pool.
     poi_pool = df_planned_locations['WEEK 1'].dropna().tolist()
     for week_num in range(2, order_horizon + 1):
-        poi_pool += df_planned_locations[f'WEEK {week_num}'].tolist()
+        poi_pool += df_planned_locations[f'WEEK {week_num}'].dropna().tolist()
 
     # Initialize some more locations lists.
     full_locations_list = [homebase] + starting_points + poi_pool
@@ -350,7 +348,7 @@ def main(_proposed_seed, _proposed_order_horizon):
             + [1] * len(functioning_vehicle_ids_this_week))
     
     # Set the time that the solver has to get to a solution.
-    max_runtime_in_seconds = (len(poi_pool) + len(functioning_vehicle_ids_this_week))*2.4*0.2
+    max_runtime_in_seconds = (len(poi_pool) + len(functioning_vehicle_ids_this_week))*2.08
 
     # Dictionary saves the final routes accessible via the ids as keys. This is needed, because from optimization to
     # optimization the order of the functioning vehicle IDs and thus the order of the routes of an optimization
@@ -382,13 +380,16 @@ def main(_proposed_seed, _proposed_order_horizon):
         # full_coords_list = [name_to_coords_dict[name] for name in full_locations_list]
         # full_coords_list = [[math.ceil(lat), math.ceil(long)] for lat, long in full_coords_list]
         # routes_indices_or_routing = generate_optimized_routes_with_or_routing(
-        #     max_runtime_in_seconds, full_coords_list, full_distances, vehicle_capacities,
-        #     full_demands, starting_point_indices, end_points_indices, functioning_vehicle_ids_this_week)
+        # max_runtime_in_seconds, full_coords_list, full_distances, vehicle_capacities,
+        # full_demands, starting_point_indices, end_points_indices, functioning_vehicle_ids_this_week)
+
+        """
         print(f"\nTours PyVRP in iteration {optimization_idx}.")
         for route_index in range(len(functioning_vehicle_ids_this_week)):
             temp_planned_tour = [full_locations_list_dummy_clients_pyvrp[loc_idx] for loc_idx in
                                  routes_indices_pyvrp[route_index]]
             print(f"Planned tour of vehicle {functioning_vehicle_ids_this_week[route_index]}: {temp_planned_tour}\n")
+        """
 
         # print(f"\nTours OR Routing in iteration {optimization_idx}. Please note that the starting point indices "
         #       f"show a value != 0 even if the starting point was the end-depot. They also do not indicate the vehicle id")
@@ -562,7 +563,7 @@ def main(_proposed_seed, _proposed_order_horizon):
         functioning_vehicle_ids_this_week = functioning_vehicle_ids.copy()
 
         # Set the time that the solver has to get to a solution.
-        max_runtime_in_seconds = (len(poi_pool) + len(functioning_vehicle_ids_this_week))*2.4*0.2
+        max_runtime_in_seconds = (len(poi_pool) + len(functioning_vehicle_ids_this_week))*2.08
 
         optimization_idx += 1
         
@@ -588,8 +589,12 @@ def main(_proposed_seed, _proposed_order_horizon):
     """
 
 if __name__ == '__main__':
-    seeds = [42, 12, 37, 6, 24, 68, 153, 402, 87, 2]
-    order_horizons = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]
-    for order_horizon in order_horizons:
-        for seed in seeds:
+    seeds = [37, 6, 24, 68, 153, 402, 87, 2]
+    order_horizons = [4, 6, 8, 10, 12, 14, 16, 18, 20]
+    #2 schon gemacht vom seed 37, jetzt mit oh 4 weiter!
+    for seed in seeds:
+        print(f"Seed: {seed}")
+        # Have atleast the 42 seeds for tomorrow!!
+        for order_horizon in order_horizons:
+            print(f"OH: {order_horizon}")
             main(_proposed_seed=seed, _proposed_order_horizon=order_horizon)
