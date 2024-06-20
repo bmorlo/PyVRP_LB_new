@@ -24,8 +24,7 @@ from pyvrp.stop import MaxRuntime
 
 # TODO:
 """
-- Why not just use MULTI-DEPOT AND MULTI-PERIOD open (D)(C)VRP
-- Why not just implement it as a multi-depot? Easily possible, but takes some more time...
+- Why do I get an infeasible solution if the number
 
 - Generate e.g. one random test instance and save it. E.g. from the literature or from André. 
 - Availabilities and locations added per week
@@ -124,8 +123,6 @@ def generate_vehicle_availability_matrix(_all_vehicle_ids, _campaign_length_in_w
     )
 """
 
-
-# TODO: We probably do not need the dummy clients anymore, once we have implemented makespan.
 def generate_optimized_routes_with_pyvrp(_max_runtime_in_seconds,
                                          _full_coords_list_dummy_clients_pyvrp,
                                          _full_distances_dummy_clients_pyvrp,
@@ -174,8 +171,8 @@ def generate_optimized_routes_with_pyvrp(_max_runtime_in_seconds,
     """Note that the indices in the from names can actually be regarded as real world coords indices"""
     first_dummy_client_location_index = len(_full_coords_list_dummy_clients_pyvrp) - len(_starting_points_indices)
     # If you subtract those two lengths you get a number equal to end-depot + artificial depots + normal clients.
-    # Since the location indices that were stored in the names correspond to the real coord indices,
-    # the first dummy client can be accessed by this very length value (since index = length - 1).
+    # Since the location indices that were stored in the names correspond to the real coord indices, the first dummy
+    # client can be accessed by this very length value (since index = length - 1).
 
     for frm in pyvrp_model.locations:
         for to in pyvrp_model.locations:
@@ -199,10 +196,11 @@ def generate_optimized_routes_with_pyvrp(_max_runtime_in_seconds,
                         # Make it a no-brainer to immediately visit it. We need the additional - 1!
                         pyvrp_model.add_edge(frm, to, distance=0)
                         # We simply disregard any edges from other artificial depots to this dummy client!
+
+                # TODO: Maybe specify those edges but not with such a high distance value!
             else:
                 # A normal client, or a depot was reached. Depots should not be able to reach any client directly.
-                # --> depot to xy = 0
-                # Thus, only set their closed loop edges.
+                # Depots should only be able to reach dummy clients directly!
                 # Depots should only be reached via "zero distance".
                 # Thus, for all the locations you are coming from, depot, client, or dummy client,
                 # set the edge back to the depot to zero.
