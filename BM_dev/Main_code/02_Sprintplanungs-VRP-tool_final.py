@@ -196,8 +196,7 @@ def generate_optimized_tours_with_pyvrp(_max_runtime_in_seconds,
                                                                pyvrp_model.vehicle_types]
 
 
-def main(_excel_input_file_name, _homebase_name_as_string,
-         _manual_capacity_override_if_more_vehicles_than_tickets, _seed):
+def main(_excel_input_file_name, _homebase_name_as_string, _seed, _manual_capacity_override_if_more_vehicles_than_tickets=0):
     """Run the optimizations for a specific order horizon length"""
 
     # Read in the central inputs.
@@ -234,7 +233,12 @@ def main(_excel_input_file_name, _homebase_name_as_string,
     full_distances_dummy_clients_pyvrp = generate_distance_matrix(full_poi_list_dummy_clients_pyvrp, dist_dict)
 
     # Initialize the vehicle capacities.
-    vehicle_capacities_dummy_clients_pyvrp = ([math.ceil((len(poi_pool) + len(vehicle_ids)) / len(vehicle_ids))] * len(vehicle_ids))
+    if _manual_capacity_override_if_more_vehicles_than_tickets != 0:
+        vehicle_capacities_dummy_clients_pyvrp = [_manual_capacity_override_if_more_vehicles_than_tickets 
+                                                  + 1] * len(vehicle_ids)
+    else:
+        vehicle_capacities_dummy_clients_pyvrp = ([math.ceil((len(poi_pool) + len(vehicle_ids)) / len(
+            vehicle_ids))] * len(vehicle_ids))
 
     # Create demands that correspond to 1) the end depot, 2) the starting points,
     # 3) the points of interest [and 4) the dummy clients].
@@ -340,6 +344,12 @@ if __name__ == '__main__':
     (1) Please specify the name of the Excel input file. Do not change the sheet names within the Excel file!
     (2) Please specify the name of the homebase for plotting purposes.
     (3) Please note that the program is internally working with symmetric distance and geodata matrices.
-    """
-    main(_excel_input_file_name='BM_dev/Main_code/Sprint_Planungs_Tool_Input_Data_Europa', 
-         _homebase_name_as_string='HKS', _seed=42)
+    (4) Please also make sure to specify a "manual_capacity_override_if_more_vehicles_than_tickets" greater than zero
+        if more vehicles than tickets exist!
+    """    
+    # capas = [5, 6, 7, 8, 9, 10]
+    # for capa in capas:
+        # print(f"Manuelle Kapazität: {capa} Tickets")
+    main(_excel_input_file_name='BM_dev/Main_code/Sprint_Planungs_Tool_Input_Data_Europa_2_FZG', 
+            _homebase_name_as_string='HKS', _seed=42, _manual_capacity_override_if_more_vehicles_than_tickets=0)
+        

@@ -26,10 +26,10 @@ import matplotlib as mplb
 
 def read_inputs():
     """Reads the inputs from the central Excel file."""
-    df_vehicle_ids = pds.read_excel('BM_dev/Main_code/Central_Input_Data_Andre.xlsx', sheet_name='Vehicle_ids')
-    df_locations_and_coords = pds.read_excel('BM_dev/Main_code/Central_Input_Data_Andre.xlsx', sheet_name='Location_names_to_coords')
-    df_planned_locations = pds.read_excel('BM_dev/Main_code/Central_Input_Data_Andre.xlsx', sheet_name='Planned_locations')
-    df_vehicle_availability_matrix = pds.read_excel('BM_dev/Main_code/Central_Input_Data_Andre.xlsx',
+    df_vehicle_ids = pds.read_excel('BM_dev/Main_code/Central_Input_Data_Andre_past_data_reopt.xlsx', sheet_name='Vehicle_ids')
+    df_locations_and_coords = pds.read_excel('BM_dev/Main_code/Central_Input_Data_Andre_past_data_reopt.xlsx', sheet_name='Location_names_to_coords')
+    df_planned_locations = pds.read_excel('BM_dev/Main_code/Central_Input_Data_Andre_past_data_reopt.xlsx', sheet_name='Planned_locations')
+    df_vehicle_availability_matrix = pds.read_excel('BM_dev/Main_code/Central_Input_Data_Andre_past_data_reopt.xlsx',
                                                     sheet_name='Vehicle_availability_matrix')
     all_location_names = df_locations_and_coords['NAME'].tolist()
 
@@ -589,12 +589,11 @@ def main(_proposed_seed, _proposed_order_horizon):
     """
 
 if __name__ == '__main__':
-    seeds = [37, 6, 24, 68, 153, 402, 87, 2]
-    order_horizons = [4, 6, 8, 10, 12, 14, 16, 18, 20]
+    seeds = [24, 68, 153, 402, 87, 2]
+    order_horizons = [2, 4, 6, 8, 10, 12, 14, 16, 18, 20]
     #2 schon gemacht vom seed 37, jetzt mit oh 4 weiter!
     for seed in seeds:
         print(f"Seed: {seed}")
-        # Have atleast the 42 seeds for tomorrow!!
         for order_horizon in order_horizons:
             print(f"OH: {order_horizon}")
             main(_proposed_seed=seed, _proposed_order_horizon=order_horizon)
