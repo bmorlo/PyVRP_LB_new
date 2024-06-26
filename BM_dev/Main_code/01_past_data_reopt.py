@@ -589,7 +589,7 @@ def main(_proposed_seed, _proposed_order_horizon):
     """
 
 if __name__ == '__main__':
-    seeds = [24, 68, 153, 402, 87, 2]
+    seeds = [42, 12, 37, 6, 24, 68, 153, 402, 87, 2]
     order_horizons = [2, 4, 6, 8, 10, 12, 14, 16, 18, 20]
     #2 schon gemacht vom seed 37, jetzt mit oh 4 weiter!
     for seed in seeds:
